@@ -45,7 +45,7 @@ from datetime import date
 #         time.sleep(20+ random.random())
 # tmp.reset_index()
 # tmp.to_csv('google_data.csv', index=True, header=True)
-##COVID DATA USA
+##COVID DATA USA CASES
 # covid_daily = pd.read_csv('https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/csse_covid_19_time_series/time_series_covid19_confirmed_US.csv')
 # dates = covid_daily.columns[11:]
 # confirmed_df_long = covid_daily.melt(
@@ -62,19 +62,33 @@ from datetime import date
 # us_covid_df.to_csv('covid_data.csv', index=True, header=True)
 
 
-# us_covid_df['date']= datetime.datetime.strptime(us_covid_df['week'] + '-1', '%G-W%V-%u')
+#covid data us deaths
+# covid_daily = pd.read_csv('https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/csse_covid_19_time_series/time_series_covid19_deaths_US.csv')
+# dates = covid_daily.columns[13:]
+# confirmed_df_long = covid_daily.melt(
+#     id_vars=['Province_State', 'Country_Region','Admin2'],
+#     value_vars=dates,
+#     var_name='Date',
+#     value_name='Death'
+# )
+# us_covid_df=confirmed_df_long.groupby([ 'Province_State','Date']).sum().reset_index()
+# us_covid_df['Date']=pd.to_datetime(us_covid_df['Date'])
+# us_covid_df['week']=us_covid_df['Date'].dt.strftime('%Y-%U')
+# us_covid_df=us_covid_df.groupby(by=['Province_State','week']).sum().reset_index()
+# us_covid_df['Date_Time'] = pd.to_datetime(us_covid_df.week + '0', format='%Y-%W%w')
+# us_covid_df.to_csv('covid_data_death.csv', index=True, header=True)
+#
 
 
 
 google_data=pd.read_csv('google_data.csv')
 covid_data=pd.read_csv('covid_data.csv')
+covid_data_death=pd.read_csv('covid_data_death.csv')
 df_us_states=pd.read_csv('us_states.csv')
-print(google_data)
-# print(df_us_states)
-
 mapped= google_data.merge(df_us_states, left_on='state', right_on='state_ab')
+covid_data=covid_data.merge(covid_data_death, on=[ 'Province_State','Date_Time'])
 df=mapped.merge(covid_data, left_on=['state_y','date'], right_on=['Province_State','Date_Time'])
 df = df[(df.isPartial == True)]
-df=df[['date','number','keyword','Province_State','Confirmed']]
+df=df[['date','number','keyword','Province_State','Confirmed','Death']]
 print(df)
 # print(covid_data[])
