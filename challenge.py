@@ -2,6 +2,24 @@ from pytrends.request import TrendReq
 import pandas as pd
 import datetime
 pd.set_option('display.max_columns', None)
+from sklearn.model_selection import cross_val_score
+from sklearn.model_selection import RepeatedKFold
+from sklearn.linear_model import Lasso
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import OneHotEncoder, MinMaxScaler
+from sklearn.linear_model import Lasso
+from sklearn.compose import ColumnTransformer
+from sklearn.preprocessing import StandardScaler
+from numpy import mean
+from numpy import std
+from numpy import absolute
+
+from scipy.stats import pearsonr
+import seaborn as sns
+import matplotlib.dates as mdates
+
+sns.set()
+import numpy as np
 
 import time
 import random
@@ -86,9 +104,121 @@ covid_data=pd.read_csv('covid_data.csv')
 covid_data_death=pd.read_csv('covid_data_death.csv')
 df_us_states=pd.read_csv('us_states.csv')
 mapped= google_data.merge(df_us_states, left_on='state', right_on='state_ab')
-covid_data=covid_data.merge(covid_data_death, on=[ 'Province_State','Date_Time'])
+covid_data=covid_data.merge(covid_data_death, on=[ 'Date_Time','Province_State'])
 df=mapped.merge(covid_data, left_on=['state_y','date'], right_on=['Province_State','Date_Time'])
-df = df[(df.isPartial == True)]
-df=df[['date','number','keyword','Province_State','Confirmed','Death']]
 print(df)
+df = df[(df.isPartial == False)]
+df=df[['date','number','keyword','Province_State','Confirmed','Death','week_x']]
+df.to_csv('df.csv', index=True, header=True)
+df=df[df.date!='2021-01-03']
+df=df[df.date!='2022-01-02']
+
+temp = df.groupby(['Province_State', 'date', ])['Confirmed', 'Death']
+temp = temp.sum().diff().reset_index()
+mask = temp['Province_State'] != temp['Province_State'].shift(1)
+temp.loc[mask, 'Confirmed'] = np.nan
+temp.loc[mask, 'Death'] = np.nan
+# renaming columns
+temp.columns = ['Province_State', 'date', 'new_case', 'new_death']
+df = pd.merge(df, temp, on=['Province_State', 'date'])
+df = df.fillna(0)
+cols = ['new_case', 'new_death']
+df[cols] = df[cols].astype('int')
+keyword=df['keyword'].unique().tolist()
+
+state=df['Province_State'].unique().tolist()
+
+
+# for i in state:
+#     for j in keyword:
+#         newdf = df[(df.keyword == j) ]
+#         newdf = newdf[(newdf.Province_State == i) ]
+#         print(newdf)
+#         fig, ax = plt.subplots(figsize=(16, 10))
+#         plt.plot_date(newdf.week_x, newdf.new_case /
+#                       newdf.new_case.max(), fmt='-')
+#         plt.plot_date(newdf.week_x, newdf.number /
+#                       newdf.number.max(), fmt='-')
+#         ax.xaxis.set_tick_params(rotation=90, labelsize=10)
+#         plt.legend(['New Covid cases (normalized)', 'Google search for '+ str(j)+ '(normalized)'])
+#         plt.savefig(str(i)+str(j)+'.png')
+#
+# df.to_csv('df.csv')
+# print(df)
 # print(covid_data[])
+
+kwords=df['keyword'].unique().tolist()
+
+states=df['Province_State'].unique().tolist()
+#
+#
+# corrs = []
+# corrsdeath=[]
+# state=[]
+# #
+# keyword=[]
+# for j in kwords:
+#     for i in states:
+#         newdf = df[(df.keyword == j) ]
+#         newdf = newdf[(newdf.Province_State == i) ]
+#         newdf = newdf.fillna(0)
+#         case= newdf.new_case / newdf.new_case.max()
+#         death= newdf.new_death / newdf.new_death.max()
+#         num= newdf.number / newdf.number.max()
+#         corr=num.corr(case, method='pearson')
+#         corrd=num.corr(death, method='pearson')
+#         corrsdeath.append(corrd)
+#         corrs.append(corr)
+#         state.append(i)
+#         keyword.append(j)
+# print(len(state))
+# print(len(keyword))
+# print(len(corrsdeath))
+# print(len(corrs))
+# correlation = pd.DataFrame(
+#     {'state': state,
+#      'keyword': keyword,
+#      'corr_case':corrs,
+#      'corr_death':corrsdeath
+#      })
+# correlation.to_csv('correlations.csv')
+correlation=pd.read_csv('correlations.csv')
+covid_data=df.merge(correlation, left_on=[ 'keyword','Province_State'],right_on=[ 'keyword','state'])
+covid_data=covid_data
+print(covid_data)
+X= covid_data[['date','number','keyword','Province_State','corr_case','new_case','Confirmed']]
+print(X)
+cat_cols=['date','keyword','Province_State']
+num_cols=['number','corr_case','new_case','Confirmed']
+# scaler = StandardScaler().fit(X[num_cols])
+other_cols = X[num_cols].to_numpy()
+ct = ColumnTransformer([('ohe', OneHotEncoder(sparse=False), cat_cols)])
+encoded_matrix = ct.fit_transform(X[cat_cols])
+encoded_cols = ct.named_transformers_.ohe.get_feature_names(cat_cols)
+numpy=X[num_cols]
+num_cols=df.to_records()
+print(other_cols)
+print(encoded_matrix)
+X_encoded = np.concatenate([encoded_matrix,other_cols],axis=1)
+X_encoded=X_encoded.transpose()
+print(X_encoded)
+print('fewa')
+y=X_encoded[-1]
+X=X_encoded[:-1]
+X=X.transpose()
+y=y.transpose()
+
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=10)
+reg = Lasso(alpha=1)
+reg.fit(X_train, y_train)
+
+
+# Training data
+pred_train = reg.predict(X_train)
+
+from sklearn.metrics import mean_squared_error
+mse_train = mean_squared_error(y_train, pred_train)
+
+# Test data
+pred = reg.predict(X_test)
+mse_test =mean_squared_error(y_test, pred)
