@@ -5,7 +5,7 @@ pd.set_option('display.max_columns', None)
 from sklearn.model_selection import cross_val_score
 from sklearn.model_selection import RepeatedKFold
 from sklearn.linear_model import Lasso
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import train_test_split, GridSearchCV
 from sklearn.preprocessing import OneHotEncoder, MinMaxScaler
 from sklearn.linear_model import Lasso
 from sklearn.compose import ColumnTransformer
@@ -182,43 +182,64 @@ states=df['Province_State'].unique().tolist()
 #      'corr_death':corrsdeath
 #      })
 # correlation.to_csv('correlations.csv')
+
 correlation=pd.read_csv('correlations.csv')
 covid_data=df.merge(correlation, left_on=[ 'keyword','Province_State'],right_on=[ 'keyword','state'])
 covid_data=covid_data
 print(covid_data)
-X= covid_data[['date','number','keyword','Province_State','corr_case','new_case','Confirmed']]
+X= covid_data[['number','keyword','corr_case','new_case','new_death','Death','corr_death','Confirmed','date']]
 print(X)
-cat_cols=['date','keyword','Province_State']
-num_cols=['number','corr_case','new_case','Confirmed']
-# scaler = StandardScaler().fit(X[num_cols])
-other_cols = X[num_cols].to_numpy()
-ct = ColumnTransformer([('ohe', OneHotEncoder(sparse=False), cat_cols)])
-encoded_matrix = ct.fit_transform(X[cat_cols])
-encoded_cols = ct.named_transformers_.ohe.get_feature_names(cat_cols)
-numpy=X[num_cols]
-num_cols=df.to_records()
-print(other_cols)
-print(encoded_matrix)
-X_encoded = np.concatenate([encoded_matrix,other_cols],axis=1)
-X_encoded=X_encoded.transpose()
-print(X_encoded)
+X=X.groupby(['keyword']).mean().reset_index()
+print('HEA',X)
+y=X[['new_case']]
+X1=X[['number','corr_case','new_death','Death','corr_death']]
+cat_cols=['keyword']
+DF=pd.get_dummies(X[['keyword']])
+X = pd.concat([X1, DF],axis=1)
+print(X)
 print('fewa')
-y=X_encoded[-1]
-X=X_encoded[:-1]
-X=X.transpose()
-y=y.transpose()
+features = X.columns
+
 
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=10)
-reg = Lasso(alpha=1)
-reg.fit(X_train, y_train)
+las = Lasso(alpha = 1.0, random_state = 0, max_iter = 10000)
+alphas = 10.**np.arange(-7, 2)
+tuned_parameters = [{'alpha': alphas}]
 
+
+# search = GridSearchCV(reg,
+#                       tuned_parameters,
+#                       cv = 5, scoring="neg_mean_squared_error",verbose=3
+#                       )
+# model=search.fit(X_train,y_train)
+# print(model.best_params_)
+# print(model.best_score_)
+# results = model.cv_results_
+# for key,value in results.items():
+#     print(key, value)
+model=las.fit(X_train,y_train)
+
+coefficients = model.coef_
+print(coefficients)
+importance = np.abs(coefficients)
+print(importance)
+print(np.array(features)[importance > 0])
+print(np.array(features)[importance == 0])
 
 # Training data
-pred_train = reg.predict(X_train)
-
+pred_train = model.predict(X_train)
 from sklearn.metrics import mean_squared_error
 mse_train = mean_squared_error(y_train, pred_train)
+print(mse_train)
+mse_test =mean_squared_error(y_test, pred)
+
+print(mse_test)
 
 # Test data
-pred = reg.predict(X_test)
-mse_test =mean_squared_error(y_test, pred)
+pred = model.predict(X_test)
+print('e',pred)
+print('h',y_test)
+pred.to_csv('prediction.csv', index=True, header=True)
+y_test.to_csv('ytest.csv', index=True, header=True)
+
+print(mse_test)
