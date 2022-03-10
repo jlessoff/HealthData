@@ -1,5 +1,6 @@
 from pytrends.request import TrendReq
 import pandas as pd
+import seaborn as sns
 import datetime
 pd.set_option('display.max_columns', None)
 from sklearn.model_selection import cross_val_score
@@ -7,7 +8,7 @@ from sklearn.model_selection import RepeatedKFold
 from sklearn.linear_model import Lasso
 from sklearn.model_selection import train_test_split, GridSearchCV
 from sklearn.preprocessing import OneHotEncoder, MinMaxScaler
-from sklearn.linear_model import Lasso
+from sklearn.linear_model import Lasso, LassoCV
 from sklearn.compose import ColumnTransformer
 from sklearn.preprocessing import StandardScaler
 from numpy import mean
@@ -29,7 +30,7 @@ from matplotlib import pyplot as plt
 from datetime import date
 
 
-# # GOOGLE DATA
+# GOOGLE DATA
 # pytrends.build_payload(kw_list=['covid','coronavirus'], timeframe=f'2020-02-26 {date.today()}', geo='US')
 # regiondf = pytrends.interest_by_region()
 # df_ibr =pytrends.interest_by_region(resolution='REGION', inc_low_vol=True)
@@ -38,8 +39,10 @@ from datetime import date
 # df_rq = list(related_queries.values())[0]['rising']
 # dfrising = pd.DataFrame(df_rq).head(20)
 # keywords=dfrising['query'].tolist()
+# print(keywords)
 # kw_list=pd.read_csv('google.csv')
 # kw_list=kw_list['0'].values.tolist()
+# print(kw_list)
 # key_words=kw_list+keywords
 # print(key_words)
 # df_us_states=pd.read_csv('us_states.csv',header=None)
@@ -80,7 +83,7 @@ from datetime import date
 # us_covid_df.to_csv('covid_data.csv', index=True, header=True)
 
 
-#covid data us deaths
+# covid data us deaths
 # covid_daily = pd.read_csv('https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/csse_covid_19_time_series/time_series_covid19_deaths_US.csv')
 # dates = covid_daily.columns[13:]
 # confirmed_df_long = covid_daily.melt(
@@ -98,7 +101,7 @@ from datetime import date
 #
 
 
-
+#
 google_data=pd.read_csv('google_data.csv')
 covid_data=pd.read_csv('covid_data.csv')
 covid_data_death=pd.read_csv('covid_data_death.csv')
@@ -109,7 +112,6 @@ df=mapped.merge(covid_data, left_on=['state_y','date'], right_on=['Province_Stat
 print(df)
 df = df[(df.isPartial == False)]
 df=df[['date','number','keyword','Province_State','Confirmed','Death','week_x']]
-df.to_csv('df.csv', index=True, header=True)
 df=df[df.date!='2021-01-03']
 df=df[df.date!='2022-01-02']
 
@@ -124,9 +126,7 @@ df = pd.merge(df, temp, on=['Province_State', 'date'])
 df = df.fillna(0)
 cols = ['new_case', 'new_death']
 df[cols] = df[cols].astype('int')
-keyword=df['keyword'].unique().tolist()
 
-state=df['Province_State'].unique().tolist()
 
 
 # for i in state:
@@ -142,24 +142,25 @@ state=df['Province_State'].unique().tolist()
 #         ax.xaxis.set_tick_params(rotation=90, labelsize=10)
 #         plt.legend(['New Covid cases (normalized)', 'Google search for '+ str(j)+ '(normalized)'])
 #         plt.savefig(str(i)+str(j)+'.png')
-#
+# #
 # df.to_csv('df.csv')
-# print(df)
 # print(covid_data[])
 
 kwords=df['keyword'].unique().tolist()
 
 states=df['Province_State'].unique().tolist()
 #
-#
-# corrs = []
-# corrsdeath=[]
-# state=[]
+
+corrs = []
+corrsdeath=[]
+date1=[]
 # #
-# keyword=[]
+keyword=[]
 # for j in kwords:
 #     for i in states:
+#
 #         newdf = df[(df.keyword == j) ]
+#
 #         newdf = newdf[(newdf.Province_State == i) ]
 #         newdf = newdf.fillna(0)
 #         case= newdf.new_case / newdf.new_case.max()
@@ -171,6 +172,7 @@ states=df['Province_State'].unique().tolist()
 #         corrs.append(corr)
 #         state.append(i)
 #         keyword.append(j)
+#
 # print(len(state))
 # print(len(keyword))
 # print(len(corrsdeath))
@@ -179,35 +181,87 @@ states=df['Province_State'].unique().tolist()
 #     {'state': state,
 #      'keyword': keyword,
 #      'corr_case':corrs,
-#      'corr_death':corrsdeath
+#      'corr_death':corrsdeath,
 #      })
-# correlation.to_csv('correlations.csv')
+# # # correlation.to_csv('correlations.csv')
+# correlation=pd.read_csv('correlations.csv')
+# corr1=correlation[['corr_case','state','keyword']]#.groupby(['keyword']).mean()
+# corr1=corr1.reset_index()
+# corr1=corr1[['keyword','corr_case']]
+# plt.gcf().subplots_adjust(bottom=0.25)
+# plt.xticks(fontsize=7)
 
-correlation=pd.read_csv('correlations.csv')
-covid_data=df.merge(correlation, left_on=[ 'keyword','Province_State'],right_on=[ 'keyword','state'])
-covid_data=covid_data
+
+# print(corr1)
+# sns.scatterplot(x="keyword", y="corr_case", data=corr1)
+# plt.xticks(rotation=90)
+# plt.show()
+#
+#
+# #
+# correlation.fillna(0)
+
+
+
+
+
+
+covid_data=df
+
+
+# covid_data=df.merge(correlation, left_on=[ 'keyword','Province_State'],right_on=[ 'keyword','state'])
+# covid_data = covid_data[(covid_data.Province_State == 'New Jersey') ]
+covid_data=covid_data.dropna()
 print(covid_data)
-X= covid_data[['number','keyword','corr_case','new_case','new_death','Death','corr_death','Confirmed','date']]
-print(X)
-X=X.groupby(['keyword']).mean().reset_index()
-print('HEA',X)
+covid_data=covid_data.set_index(['Province_State','date'])
+shifted = covid_data.groupby(level="Province_State").new_death.shift(1).abs()
+print(shifted)
+print(type(shifted))
+# covid_data=covid_data.reset_index()
+
+covid_data['new_death_shift']= shifted[1]
+
+
+#
+# print(covid_data)
+#
+# print(covid_data)
+
+# covid_data=covid_data.dropna()
+# print(covid_data)
+#
+#
+# covid_data=covid_data.reset_index()
+print(covid_data)
+X= covid_data[['number','keyword','new_case','new_death','new_death_shift','Death','Confirmed']]
+# print(X)
+#
+
+#
+X=X.dropna()
+
+X1=X[['new_death','number']]
 y=X[['new_case']]
-X1=X[['number','corr_case','new_death','Death','corr_death']]
-cat_cols=['keyword']
+DF=X['number']
 DF=pd.get_dummies(X[['keyword']])
+X=DF
+
 X = pd.concat([X1, DF],axis=1)
+
+# print(X)
 print(X)
-print('fewa')
 features = X.columns
+# X = scaler.fit_transform(X)
+#
+# print(y)
 
-
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=10)
-las = Lasso(alpha = 1.0, random_state = 0, max_iter = 10000)
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=150)
+las = Lasso(alpha = 10)
 alphas = 10.**np.arange(-7, 2)
 tuned_parameters = [{'alpha': alphas}]
 
 
-# search = GridSearchCV(reg,
+# search = GridSearchCV(las,
 #                       tuned_parameters,
 #                       cv = 5, scoring="neg_mean_squared_error",verbose=3
 #                       )
@@ -218,28 +272,35 @@ tuned_parameters = [{'alpha': alphas}]
 # for key,value in results.items():
 #     print(key, value)
 model=las.fit(X_train,y_train)
-
 coefficients = model.coef_
 print(coefficients)
 importance = np.abs(coefficients)
-print(importance)
-print(np.array(features)[importance > 0])
-print(np.array(features)[importance == 0])
+#
+print(list(zip(coefficients, features)))
+#
 
-# Training data
+# print(np.array(features)[importance > 0.5])
+# print(np.array(features)[importance < 1])
+#
+# # Training data
 pred_train = model.predict(X_train)
-from sklearn.metrics import mean_squared_error
-mse_train = mean_squared_error(y_train, pred_train)
-print(mse_train)
-mse_test =mean_squared_error(y_test, pred)
+from sklearn.metrics import mean_squared_error, r2_score
 
-print(mse_test)
-
-# Test data
+# # Test data
 pred = model.predict(X_test)
-print('e',pred)
-print('h',y_test)
-pred.to_csv('prediction.csv', index=True, header=True)
-y_test.to_csv('ytest.csv', index=True, header=True)
+mse_train = mean_squared_error(y_test, pred)
+r2= r2_score(y_test, pred)
+print('mse test',mse_train)
+print('r2 test',r2)
+#
+y=y.values.tolist()
 
-print(mse_test)
+prediction = model.predict(X)
+mse = mean_squared_error(y, prediction)
+r2= r2_score(y, prediction)
+print('mse',mse)
+print('r2',r2)
+
+plt.plot(y)
+plt.plot(prediction)
+plt.show()
