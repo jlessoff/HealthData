@@ -36,6 +36,7 @@ df[cols] = df[cols].astype('int')
 correlation=pd.read_csv('correlations.csv')
 covid_data=df.merge(correlation, left_on=[ 'keyword','Province_State'],right_on=[ 'keyword','state'])
 covid_data=covid_data
+
 X= covid_data[['number','keyword','corr_case','new_case','Province_State','new_death','Death','corr_death','Confirmed','date']]
 X=X.set_index('Province_State')
 shifted = X.groupby(level="Province_State").new_death.shift(1).abs().reset_index()
@@ -45,7 +46,7 @@ X=X.set_index('date')
 X=X.groupby(['keyword']).mean().reset_index()
 
 y=X[['new_case']]
-X1=X[['new_death']]
+X1=X[['new_death_shift','number']]
 cat_cols=['keyword']
 DF=pd.get_dummies(X[['keyword']])
 X = pd.concat([X1, DF],axis=1)
@@ -62,6 +63,7 @@ search = GridSearchCV(las,
                       )
 model=search.fit(X_train,y_train)
 print('best param',model.best_params_)
+
 # print(model.best_score_)
 # results = model.cv_results_
 # for key,value in results.items():

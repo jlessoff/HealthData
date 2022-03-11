@@ -54,6 +54,7 @@ from datetime import date
 # print(key_words)
 
 
+###GET INDEX; GET POPULAROTY
 # for j in us_states:
 #     for i in key_words:
 #         pytrends.build_payload(kw_list=[i],timeframe=f'2020-02-26 {date.today()}', geo=j)
@@ -66,6 +67,8 @@ from datetime import date
 #         time.sleep(20+ random.random())
 # tmp.reset_index()
 # tmp.to_csv('google_data.csv', index=True, header=True)
+
+
 ##COVID DATA USA CASES
 # covid_daily = pd.read_csv('https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/csse_covid_19_time_series/time_series_covid19_confirmed_US.csv')
 # dates = covid_daily.columns[11:]
@@ -83,7 +86,7 @@ from datetime import date
 # us_covid_df.to_csv('covid_data.csv', index=True, header=True)
 
 
-# covid data us deaths
+# COVID US DEATHS
 # covid_daily = pd.read_csv('https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/csse_covid_19_time_series/time_series_covid19_deaths_US.csv')
 # dates = covid_daily.columns[13:]
 # confirmed_df_long = covid_daily.melt(
@@ -101,7 +104,7 @@ from datetime import date
 #
 
 
-#
+#DATA WRANGLING
 google_data=pd.read_csv('google_data.csv')
 covid_data=pd.read_csv('covid_data.csv')
 covid_data_death=pd.read_csv('covid_data_death.csv')
@@ -109,7 +112,6 @@ df_us_states=pd.read_csv('us_states.csv')
 mapped= google_data.merge(df_us_states, left_on='state', right_on='state_ab')
 covid_data=covid_data.merge(covid_data_death, on=[ 'Date_Time','Province_State'])
 df=mapped.merge(covid_data, left_on=['state_y','date'], right_on=['Province_State','Date_Time'])
-print(df)
 df = df[(df.isPartial == False)]
 df=df[['date','number','keyword','Province_State','Confirmed','Death','week_x']]
 df=df[df.date!='2021-01-03']
@@ -128,7 +130,7 @@ cols = ['new_case', 'new_death']
 df[cols] = df[cols].astype('int')
 
 
-
+#GET GRAPH FOR PEARSON COEFFICIENT
 # for i in state:
 #     for j in keyword:
 #         newdf = df[(df.keyword == j) ]
@@ -146,141 +148,110 @@ df[cols] = df[cols].astype('int')
 # df.to_csv('df.csv')
 # print(covid_data[])
 
+
+#SCATTERPLOT FOR MEAN PEARSON COEFFICIENT
 kwords=df['keyword'].unique().tolist()
-
 states=df['Province_State'].unique().tolist()
-#
-
 corrs = []
 corrsdeath=[]
+state=[]
 date1=[]
-# #
+#
 keyword=[]
-# for j in kwords:
-#     for i in states:
-#
-#         newdf = df[(df.keyword == j) ]
-#
-#         newdf = newdf[(newdf.Province_State == i) ]
-#         newdf = newdf.fillna(0)
-#         case= newdf.new_case / newdf.new_case.max()
-#         death= newdf.new_death / newdf.new_death.max()
-#         num= newdf.number / newdf.number.max()
-#         corr=num.corr(case, method='pearson')
-#         corrd=num.corr(death, method='pearson')
-#         corrsdeath.append(corrd)
-#         corrs.append(corr)
-#         state.append(i)
-#         keyword.append(j)
-#
-# print(len(state))
-# print(len(keyword))
-# print(len(corrsdeath))
-# print(len(corrs))
-# correlation = pd.DataFrame(
-#     {'state': state,
-#      'keyword': keyword,
-#      'corr_case':corrs,
-#      'corr_death':corrsdeath,
-#      })
-# # # correlation.to_csv('correlations.csv')
-# correlation=pd.read_csv('correlations.csv')
-# corr1=correlation[['corr_case','state','keyword']]#.groupby(['keyword']).mean()
-# corr1=corr1.reset_index()
-# corr1=corr1[['keyword','corr_case']]
-# plt.gcf().subplots_adjust(bottom=0.25)
-# plt.xticks(fontsize=7)
+for j in kwords:
+    for i in states:
 
+        newdf = df[(df.keyword == j) ]
 
-# print(corr1)
-# sns.scatterplot(x="keyword", y="corr_case", data=corr1)
-# plt.xticks(rotation=90)
-# plt.show()
-#
-#
-# #
-# correlation.fillna(0)
+        newdf = newdf[(newdf.Province_State == i) ]
+        newdf = newdf.fillna(0)
+        case= newdf.new_case / newdf.new_case.max()
+        death= newdf.new_death / newdf.new_death.max()
+        num= newdf.number / newdf.number.max()
+        corr=num.corr(case, method='pearson')
+        corrd=num.corr(death, method='pearson')
+        corrsdeath.append(corrd)
+        corrs.append(corr)
+        state.append(i)
+        keyword.append(j)
+
+correlation = pd.DataFrame(
+    {'state': state,
+     'keyword': keyword,
+     'corr_case':corrs,
+     'corr_death':corrsdeath,
+     })
+# # correlation.to_csv('correlations.csv')
+correlation=pd.read_csv('correlations.csv')
+corr1=correlation[['corr_case','corr_death','state','keyword']].groupby(['keyword']).mean()
+corr1=corr1.reset_index()
+corr1=corr1[['keyword','corr_case','corr_death']]
+sns.scatterplot(x="keyword", y="corr_case", data=corr1)
+plt.xticks(rotation=90)
+plt.show()
+sns.scatterplot(x="keyword", y="corr_death", data=corr1)
+plt.xticks(rotation=90)
+plt.show()
 
 
 
 
 
 
+#DATA PREPROCESSING FOR THE MODEL
 covid_data=df
-
-
-# covid_data=df.merge(correlation, left_on=[ 'keyword','Province_State'],right_on=[ 'keyword','state'])
-# covid_data = covid_data[(covid_data.Province_State == 'New Jersey') ]
 covid_data=covid_data.dropna()
-print(covid_data)
+covid_data=covid_data[covid_data.Province_State=='Arkansas']
 covid_data=covid_data.set_index(['Province_State','date'])
-shifted = covid_data.groupby(level="Province_State").new_death.shift(1).abs()
-print(shifted)
-print(type(shifted))
-# covid_data=covid_data.reset_index()
+shifted = covid_data.groupby(level="Province_State").new_death.shift(1).abs().reset_index()
+shifted=shifted.set_index(['Province_State','date'])
+covid_data['new_death_shift']= shifted['new_death']
+covid_data=covid_data.dropna()
+covid_data=covid_data.reset_index()
+covid_data=covid_data.set_index(['date'])
 
-covid_data['new_death_shift']= shifted[1]
-
-
-#
-# print(covid_data)
-#
-# print(covid_data)
-
-# covid_data=covid_data.dropna()
-# print(covid_data)
-#
-#
-# covid_data=covid_data.reset_index()
-print(covid_data)
 X= covid_data[['number','keyword','new_case','new_death','new_death_shift','Death','Confirmed']]
-# print(X)
-#
-
-#
-X=X.dropna()
-
-X1=X[['new_death','number']]
 y=X[['new_case']]
-DF=X['number']
+X1=X[['new_death_shift','number']]
 DF=pd.get_dummies(X[['keyword']])
-X=DF
-
 X = pd.concat([X1, DF],axis=1)
 
-# print(X)
-print(X)
 features = X.columns
-# X = scaler.fit_transform(X)
-#
-# print(y)
 
+#scale
+scaler=StandardScaler()
+X = scaler.fit_transform(X)
+
+#split
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=150)
+
+
+#gridsearchcv
 las = Lasso(alpha = 10)
 alphas = 10.**np.arange(-7, 2)
 tuned_parameters = [{'alpha': alphas}]
-
-
-# search = GridSearchCV(las,
-#                       tuned_parameters,
-#                       cv = 5, scoring="neg_mean_squared_error",verbose=3
-#                       )
-# model=search.fit(X_train,y_train)
-# print(model.best_params_)
-# print(model.best_score_)
-# results = model.cv_results_
+search = GridSearchCV(las,
+                      tuned_parameters,
+                      cv = 5, scoring="neg_mean_squared_error",verbose=3
+                      )
+model=search.fit(X_train,y_train)
+print(model.best_params_)
+print(model.best_score_)
+results = model.cv_results_
 # for key,value in results.items():
 #     print(key, value)
+
+
 model=las.fit(X_train,y_train)
 coefficients = model.coef_
 print(coefficients)
 importance = np.abs(coefficients)
-#
+#print coefficients
 print(list(zip(coefficients, features)))
 #
 
-# print(np.array(features)[importance > 0.5])
-# print(np.array(features)[importance < 1])
+print(np.array(features)[importance > 0])
+print(np.array(features)[importance == 0])
 #
 # # Training data
 pred_train = model.predict(X_train)
@@ -293,7 +264,6 @@ r2= r2_score(y_test, pred)
 print('mse test',mse_train)
 print('r2 test',r2)
 #
-y=y.values.tolist()
 
 prediction = model.predict(X)
 mse = mean_squared_error(y, prediction)
@@ -301,6 +271,9 @@ r2= r2_score(y, prediction)
 print('mse',mse)
 print('r2',r2)
 
+y['prediction']=prediction
 plt.plot(y)
-plt.plot(prediction)
+# plt.plot(prediction)
+plt.xticks(fontsize=7,rotation=90)
+plt.legend(y)
 plt.show()
